@@ -51,6 +51,15 @@ private:
         return index_c_ >= 0 && index_c_ > index_q_;
     }
 
+    [[nodiscard]] inline bool AreNeighbours(int32_t a, int32_t b) const {
+        assert(a >= 0 && a < size_);
+        assert(b >= 0 && b < size_);
+
+        bool a_has_b = vertices_neighbours_[a].find(b) != vertices_neighbours_[a].end();
+        bool b_has_a = vertices_neighbours_[b].find(a) != vertices_neighbours_[b].end();
+        return a_has_b && b_has_a;
+    }
+
     inline void SwapVerticesByQcoIndices(int32_t index_a, int32_t index_b) {
         assert(index_a >= 0 && index_a < size_);
         assert(index_b >= 0 && index_b < size_);
@@ -161,6 +170,41 @@ public:
         SwapVerticesByQcoIndices(index_vertex, index_c_);
 
         index_c_ -= 1;
+    }
+
+    bool Swap1to2() {
+        for (int32_t index_clique = 0; index_clique <= index_q_; index_clique++) {
+            int vertex_clique = qco_[index_clique];
+
+            const auto& non_neighbours = vertices_non_neighbours_[vertex_clique];
+
+            for (const auto& non_neighbour_a: non_neighbours) {
+                if (tightness_[non_neighbour_a] != 1) {
+                    continue;
+                }
+
+                for (const auto& non_neighbour_b: non_neighbours) {
+                    if (non_neighbour_a == non_neighbour_b) {
+                        continue;
+                    }
+
+                    if (tightness_[non_neighbour_b] != 1) {
+                        continue;
+                    }
+
+                    if (!AreNeighbours(non_neighbour_a, non_neighbour_b)) {
+                        continue;
+                    }
+
+                    RemoveFromClique(vertex_clique);
+                    AddToClique(non_neighbour_a);
+                    AddToClique(non_neighbour_b);
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     bool Swap1To1() {
