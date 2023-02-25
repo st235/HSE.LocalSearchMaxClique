@@ -239,6 +239,10 @@ public:
 
 namespace {
 
+double RoundTo(double value, double precision = 1.0) {
+    return std::round(value / precision) * precision;
+}
+
 int32_t GenerateInRange(int32_t start, int32_t finish) {
     int32_t width = finish - start + 1;
     return static_cast<int32_t>(std::rand() % width + start);
@@ -623,7 +627,7 @@ public:
         }
     }
 
-    const unordered_set<int> &GetClique() {
+    const unordered_set<int>& GetClique() {
         return best_clique_;
     }
 
@@ -647,6 +651,7 @@ int main() {
     int randomization;
     cout << "Randomization: ";
     cin >> randomization;
+
     vector<string> files = {
             "brock200_1.clq", "brock200_2.clq", "brock200_3.clq", "brock200_4.clq",
             "brock400_1.clq", "brock400_2.clq", "brock400_3.clq", "brock400_4.clq",
@@ -659,22 +664,38 @@ int main() {
             "p_hat1000-1.clq", "p_hat1000-2.clq", "p_hat1500-1.clq",
             "p_hat300-3.clq", "p_hat500-3.clq",
             "san1000.clq",
-            "sanr200_0.9.clq", "sanr400_0.7.clq"};
+            "sanr200_0.9.clq", "sanr400_0.7.clq" };
 
-    ofstream fout("clique_tabu.csv");
+    std::ofstream fout("clique_tabu.csv");
     fout << "File; Clique; Time (sec)\n";
-    for (string file: files) {
+
+    std::cout << std::setfill(' ') << std::setw(20) << "Instance"
+              << std::setfill(' ') << std::setw(10) << "Clique"
+              << std::setfill(' ') << std::setw(15) << "Time, sec"
+              << std::endl;
+
+    for (const auto& file: files) {
         MaxCliqueTabuSearch problem;
         problem.ReadGraphFile("data/" + file);
+
         clock_t start = clock();
         problem.RunSearch(iterations, randomization);
+
+        clock_t end = clock();
+        clock_t ticks_diff = end - start;
+        double seconds_diff = RoundTo(double(ticks_diff) / CLOCKS_PER_SEC, 0.001);
+
         if (!problem.Check()) {
             cout << "*** WARNING: incorrect clique ***\n";
             fout << "*** WARNING: incorrect clique ***\n";
         }
-        fout << file << "; " << problem.GetClique().size() << "; " << double(clock() - start) / CLOCKS_PER_SEC << '\n';
-        cout << file << ", result - " << problem.GetClique().size() << ", time - "
-             << double(clock() - start) / CLOCKS_PER_SEC << '\n';
+
+        fout << file << "; " << problem.GetClique().size() << "; " << seconds_diff << '\n';
+
+        std::cout << std::setfill(' ') << std::setw(20) << file
+                  << std::setfill(' ') << std::setw(10) << problem.GetClique().size()
+                  << std::setfill(' ') << std::setw(15) << seconds_diff
+                  << std::endl;
     }
 
     fout.close();
