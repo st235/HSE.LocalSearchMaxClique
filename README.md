@@ -2,11 +2,18 @@
 
 ## Build
 
+
+[`local_search_max_clique.cpp`](./local_search_max_clique.cpp) is the main file and contains the implementation. To build a CLI application you need to run the command below:
+
 ```bash
 g++ -std=c++17 local_search_max_clique.cpp -O3
 ```
 
+Please, pay attention that app requires **C++ 17**. You should use one of the [compilers that support](https://en.cppreference.com/w/cpp/compiler_support/17) the standard.
+
 ## Report
+
+The output of one program run can be found in **below** or in [`clique_tabu.csv`](./clique_tabu.csv).
 
 ```text
             Instance    Clique      Time, sec
@@ -36,3 +43,4 @@ g++ -std=c++17 local_search_max_clique.cpp -O3
      sanr200_0.9.clq        42          6.856
      sanr400_0.7.clq        21         25.738
 ```
+P.S.: Thank you for reading!
