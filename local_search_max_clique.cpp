@@ -8,10 +8,234 @@
 #include <iterator>
 #include <cstddef>
 #include <random>
+#include <queue>
 #include <unordered_set>
+#include <unordered_map>
 #include <algorithm>
 
 using namespace std;
+
+namespace std {
+
+    template<class T>
+    class linked_unordered_set {
+    private:
+        template<class V>
+        struct LinkedNode {
+            V item;
+            LinkedNode<V>* prev;
+            LinkedNode<V>* next;
+
+            explicit LinkedNode(const V& item):
+                    item(item),
+                    prev(nullptr),
+                    next(nullptr) {
+                // empty on purpose
+            }
+            LinkedNode(const LinkedNode<V>& node) = default;
+            LinkedNode<V>& operator=(const LinkedNode<V>& node) = default;
+
+            ~LinkedNode() = default;
+        };
+
+        size_t size_;
+        size_t capacity_;
+
+        std::unordered_map<T, LinkedNode<T>*> lookup_;
+        LinkedNode<T>* head_;
+        LinkedNode<T>* tail_;
+
+        [[nodiscard]] LinkedNode<T>* addToList(const T& item) {
+            auto* node = new LinkedNode<T>(item);
+
+            if (head_ == nullptr) {
+                assert(tail_ == nullptr);
+
+                head_ = node;
+                tail_ = node;
+            } else {
+                // head_ is not null.
+                assert(tail_ != nullptr);
+
+                tail_->next = node;
+                node->prev = tail_;
+                tail_ = node;
+            }
+
+            return node;
+        }
+
+        void removeFromList(const T& item) {
+            LinkedNode<T>* node = lookup_.at(item);
+
+            LinkedNode<T>* prev = node->prev;
+            LinkedNode<T>* next = node->next;
+
+            if (prev != nullptr) {
+                prev->next = next;
+            }
+
+            if (next != nullptr) {
+                next->prev = prev;
+            }
+
+            if (head_ == node) {
+                head_ = next;
+            }
+
+            if (tail_ == node) {
+                tail_ = prev;
+            }
+
+            delete node;
+        }
+
+        LinkedNode<T>* createDeepCopy(LinkedNode<T>* list) {
+            if (list == nullptr) {
+                return nullptr;
+            }
+
+            auto* node = new LinkedNode<T>(list->item);
+
+            auto* next = createDeepCopy(node->next);
+            if (next != nullptr) {
+                next->prev = node;
+            }
+
+            node->next = next;
+            return node;
+        }
+
+    public:
+        explicit linked_unordered_set(size_t capacity):
+                size_(0),
+                capacity_(capacity),
+                lookup_(),
+                head_(nullptr),
+                tail_(nullptr) {
+            // empty on purpose
+        }
+
+        linked_unordered_set(const linked_unordered_set<T>& that):
+                size_(that.size_),
+                capacity_(that.capacity_),
+                lookup_(),
+                head_(nullptr),
+                tail_(nullptr) {
+            head_ = createDeepCopy(that.head_);
+            tail_ = head_;
+
+            while (tail_ != nullptr && tail_->next != nullptr) {
+                lookup_.insert({ tail_->item, tail_ });
+                tail_ = tail_->next;
+            }
+
+            if (tail_ != nullptr) {
+                lookup_.insert({ tail_->item, tail_ });
+            }
+        }
+
+        linked_unordered_set<T>& operator=(const linked_unordered_set<T>& that) {
+            if (this != &that) {
+                size_ = that.size_;
+                capacity_ = that.capacity_;
+
+                lookup_.clear();
+                LinkedNode<T>* node = head_;
+
+                while (node != nullptr) {
+                    auto* next = node->next;
+                    delete node;
+                    node = next;
+                }
+
+                head_ = createDeepCopy(that.head_);
+                tail_ = head_;
+
+                while (tail_ != nullptr && tail_->next != nullptr) {
+                    lookup_.insert({ tail_->item, tail_ });
+                    tail_ = tail_->next;
+                }
+
+                if (tail_ != nullptr) {
+                    lookup_.insert({ tail_->item, tail_ });
+                }
+            }
+
+            return &this;
+        }
+
+        void insert(const T& item) {
+            if (contains(item)) {
+                remove(item);
+            }
+
+            auto* node = addToList(item);
+            lookup_.insert({ item, node });
+
+            size_ += 1;
+
+            if (size_ > capacity_) {
+                remove();
+            }
+        }
+
+        bool remove(const T& item) {
+            if (!contains(item)) {
+                return false;
+            }
+
+            removeFromList(item);
+            lookup_.erase(item);
+            size_ -= 1;
+            return true;
+        }
+
+        T remove() {
+            if (empty()) {
+                throw std::runtime_error("Cannot remove item from empty set.");
+            }
+
+            assert(head_ != nullptr && tail_ != nullptr);
+            assert(!lookup_.empty());
+
+            // We need to explicitly copy
+            // the item before it would be removed.
+            T item(head_->item);
+            remove(item);
+            return item;
+        }
+
+        [[nodiscard]] inline bool contains(const T& item) const {
+            return lookup_.find(item) != lookup_.end();
+        }
+
+        [[nodiscard]] inline bool empty() const {
+            bool is_empty = lookup_.empty();
+            if (is_empty) {
+                assert(head_ == nullptr && tail_ == nullptr);
+            } else {
+                assert(head_ != nullptr && tail_ != nullptr);
+            }
+            return is_empty;
+        }
+
+        [[nodiscard]] inline size_t size() const {
+            return size_;
+        }
+
+        ~linked_unordered_set() {
+            LinkedNode<T>* node = head_;
+
+            while (node != nullptr) {
+                LinkedNode<T>* real_next = node->next;
+                delete node;
+                node = real_next;
+            }
+        }
+    };
+
+} // namespace std
 
 namespace {
 
@@ -19,6 +243,42 @@ int32_t GenerateInRange(int32_t start, int32_t finish) {
     int32_t width = finish - start + 1;
     return static_cast<int32_t>(std::rand() % width + start);
 }
+
+class TabooList {
+private:
+    std::linked_unordered_set<int32_t> added_vertices_;
+    std::linked_unordered_set<int32_t> removed_vertices_;
+
+public:
+    TabooList(size_t added_tabu_size,
+              size_t removed_tabu_size):
+             added_vertices_(added_tabu_size),
+             removed_vertices_(removed_tabu_size) {
+        assert(added_tabu_size > 0);
+        assert(removed_tabu_size > 0);
+    }
+
+    TabooList(const TabooList& that) = default;
+    TabooList& operator=(const TabooList& that) = default;
+
+    void RestrictRemovedVertex(int32_t vertex) {
+        removed_vertices_.insert(vertex);
+    }
+
+    void RestrictAddedVertex(int32_t vertex) {
+        added_vertices_.insert(vertex);
+    }
+
+    [[nodiscard]] inline bool IsInRemovedList(int32_t vertex) const {
+        return removed_vertices_.contains(vertex);
+    }
+
+    [[nodiscard]] inline bool IsInAddedList(int32_t vertex) const {
+        return added_vertices_.contains(vertex);
+    }
+
+    ~TabooList() = default;
+};
 
 class Clique {
 private:
@@ -33,6 +293,8 @@ private:
     std::vector<int32_t> qco_;
     std::vector<int32_t> index_;
     std::vector<int32_t> tightness_;
+
+    TabooList tabu_list_;
 
     [[nodiscard]] inline bool IsClique(int vertex) const {
         const auto& vertex_index = index_[vertex];
@@ -76,14 +338,15 @@ private:
 public:
     Clique(size_t size,
            const std::vector<std::unordered_set<int32_t>>& graph):
-        size_(size),
-        index_q_(-1),
-        index_c_(-1),
-        vertices_neighbours_(graph),
-        vertices_non_neighbours_(size),
-        qco_(size),
-        index_(size),
-        tightness_(size) {
+            size_(size),
+            index_q_(-1),
+            index_c_(-1),
+            vertices_neighbours_(graph),
+            vertices_non_neighbours_(size),
+            qco_(size),
+            index_(size),
+            tightness_(size),
+            tabu_list_(3, 1) {
         assert(size >= 0);
 
         // All items are candidates as the clique is empty.
@@ -176,10 +439,16 @@ public:
         for (int32_t index_clique = 0; index_clique <= index_q_; index_clique++) {
             int vertex_clique = qco_[index_clique];
 
+            // We should not remove recently added vertex.
+            if (tabu_list_.IsInAddedList(vertex_clique)) {
+                continue;
+            }
+
             const auto& non_neighbours = vertices_non_neighbours_[vertex_clique];
 
             for (const auto& non_neighbour_a: non_neighbours) {
-                if (tightness_[non_neighbour_a] != 1) {
+                if (tabu_list_.IsInRemovedList(non_neighbour_a)
+                    || tightness_[non_neighbour_a] != 1) {
                     continue;
                 }
 
@@ -188,7 +457,8 @@ public:
                         continue;
                     }
 
-                    if (tightness_[non_neighbour_b] != 1) {
+                    if (tabu_list_.IsInRemovedList(non_neighbour_b)
+                        || tightness_[non_neighbour_b] != 1) {
                         continue;
                     }
 
@@ -197,8 +467,12 @@ public:
                     }
 
                     RemoveFromClique(vertex_clique);
+                    tabu_list_.RestrictRemovedVertex(vertex_clique);
+
                     AddToClique(non_neighbour_a);
                     AddToClique(non_neighbour_b);
+                    tabu_list_.RestrictAddedVertex(non_neighbour_a);
+                    tabu_list_.RestrictAddedVertex(non_neighbour_b);
                     return true;
                 }
             }
@@ -211,10 +485,23 @@ public:
         for (int32_t index_clique = 0; index_clique <= index_q_; index_clique++) {
             int vertex_clique = qco_[index_clique];
 
+            // We should not remove recently added vertex.
+            if (tabu_list_.IsInAddedList(vertex_clique)) {
+                continue;
+            }
+
             for (const auto& non_neighbour: vertices_non_neighbours_[vertex_clique]) {
+                // We should not add recently removed vertex.
+                if (tabu_list_.IsInRemovedList(non_neighbour)) {
+                    continue;
+                }
+
                 if (tightness_[non_neighbour] == 1) {
                     RemoveFromClique(vertex_clique);
+                    tabu_list_.RestrictRemovedVertex(vertex_clique);
+
                     AddToClique(non_neighbour);
+                    tabu_list_.RestrictAddedVertex(non_neighbour);
                     return true;
                 }
             }
@@ -362,7 +649,7 @@ int main() {
     cin >> randomization;
     vector<string> files = {
             "brock200_1.clq", "brock200_2.clq", "brock200_3.clq", "brock200_4.clq",
-            "brock200_1.clq", "brock200_2.clq", "brock200_3.clq", "brock200_4.clq",
+            "brock400_1.clq", "brock400_2.clq", "brock400_3.clq", "brock400_4.clq",
             "C125.9.clq",
             "gen200_p0.9_44.clq", "gen200_p0.9_55.clq",
             "hamming8-4.clq",
