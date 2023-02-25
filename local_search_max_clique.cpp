@@ -13,8 +13,6 @@
 #include <unordered_map>
 #include <algorithm>
 
-using namespace std;
-
 namespace std {
 
 template<class T>
@@ -545,15 +543,15 @@ public:
 
 class MaxCliqueTabuSearch {
 private:
-    vector <unordered_set<int>> graph_;
-    unordered_set<int> best_clique_;
+    std::vector<std::unordered_set<int32_t>> graph_;
+    std::unordered_set<int32_t> best_clique_;
 
     void RunInitialHeuristic(int randomization,
                              Clique& clique) {
         //todo(st235): replace initial heuristic.
         std::mt19937 generator;
 
-        vector<int> candidates(graph_.size());
+        std::vector<int32_t> candidates(graph_.size());
         for (size_t i = 0; i < graph_.size(); ++i) {
             candidates[i] = i;
         }
@@ -561,7 +559,7 @@ private:
 
         while (!candidates.empty()) {
             int last = candidates.size() - 1;
-            int rnd = GenerateInRange(0, min(randomization - 1, last));
+            int rnd = GenerateInRange(0, std::min(randomization - 1, last));
             int vertex = candidates[rnd];
 
             clique.AddToClique(vertex);
@@ -627,7 +625,7 @@ public:
         }
     }
 
-    const unordered_set<int>& GetClique() {
+    const std::unordered_set<int32_t>& GetClique() {
         return best_clique_;
     }
 
@@ -635,7 +633,7 @@ public:
         for (int i: best_clique_) {
             for (int j: best_clique_) {
                 if (i != j && graph_[i].count(j) == 0) {
-                    cout << "Returned subgraph is not clique\n";
+                    std::cout << "Returned subgraph is not clique\n";
                     return false;
                 }
             }
@@ -646,13 +644,13 @@ public:
 
 int main() {
     int iterations;
-    cout << "Number of iterations: ";
-    cin >> iterations;
+    std::cout << "Number of iterations: ";
+    std::cin >> iterations;
     int randomization;
-    cout << "Randomization: ";
-    cin >> randomization;
+    std::cout << "Randomization: ";
+    std::cin >> randomization;
 
-    vector<string> files = {
+    std::vector<std::string> files = {
             "brock200_1.clq", "brock200_2.clq", "brock200_3.clq", "brock200_4.clq",
             "brock400_1.clq", "brock400_2.clq", "brock400_3.clq", "brock400_4.clq",
             "C125.9.clq",
@@ -686,7 +684,7 @@ int main() {
         double seconds_diff = RoundTo(double(ticks_diff) / CLOCKS_PER_SEC, 0.001);
 
         if (!problem.Check()) {
-            cout << "*** WARNING: incorrect clique ***\n";
+            std::cout << "*** WARNING: incorrect clique ***\n";
             fout << "*** WARNING: incorrect clique ***\n";
         }
 
