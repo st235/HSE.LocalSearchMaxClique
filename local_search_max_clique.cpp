@@ -11,6 +11,7 @@
 #include <queue>
 #include <unordered_set>
 #include <unordered_map>
+#include <set>
 #include <algorithm>
 
 namespace std {
@@ -204,6 +205,22 @@ public:
         return item;
     }
 
+    void clear() {
+        size_ = 0;
+        lookup_.clear();
+
+        LinkedNode<T>* node = head_;
+
+        while (node != nullptr) {
+            auto* next = node->next;
+            delete node;
+            node = next;
+        }
+
+        head_ = nullptr;
+        tail_ = nullptr;
+    }
+
     [[nodiscard]] inline bool contains(const T& item) const {
         return lookup_.find(item) != lookup_.end();
     }
@@ -246,6 +263,20 @@ int32_t GenerateInRange(int32_t start, int32_t finish) {
     return static_cast<int32_t>(std::rand() % width + start);
 }
 
+constexpr uint32_t kOperationMove = 1;
+constexpr uint32_t kOperationSwap11 = 2;
+constexpr uint32_t kOperationSwap12 = 3;
+
+constexpr uint32_t kOperations[] = { kOperationMove, kOperationMove, kOperationMove, kOperationMove, kOperationMove,
+                                     kOperationSwap11, kOperationSwap11, kOperationSwap11,
+                                     kOperationSwap12, kOperationSwap12 };
+
+uint32_t GetOperation() {
+    static_assert(sizeof(kOperations) / sizeof(uint32_t) == 10);
+    return kOperations[GenerateInRange(0, 9)];
+}
+
+
 class TabooList {
 private:
     std::linked_unordered_set<int32_t> added_vertices_;
@@ -269,6 +300,11 @@ public:
 
     void RestrictAddedVertex(int32_t vertex) {
         added_vertices_.insert(vertex);
+    }
+
+    void Clear() {
+        added_vertices_.clear();
+        removed_vertices_.clear();
     }
 
     [[nodiscard]] inline bool IsInRemovedList(int32_t vertex) const {
@@ -437,7 +473,19 @@ public:
         index_c_ -= 1;
     }
 
+    void Perturb(size_t max_perturbation) {
+        for (size_t i = 0; i < std::min(max_perturbation, CliqueSize()); i++) {
+            int32_t random_clique_index = GenerateInRange(0, index_q_);
+            int32_t vertex = qco_[random_clique_index];
+            RemoveFromClique(vertex);
+            tabu_list_.Clear();
+        }
+    }
+
     bool Swap1to2() {
+        std::vector<int32_t> removals;
+        std::vector<std::vector<std::pair<int32_t, int32_t>>> additions;
+
         for (int32_t index_clique = 0; index_clique <= index_q_; index_clique++) {
             int vertex_clique = qco_[index_clique];
 
@@ -447,6 +495,7 @@ public:
             }
 
             const auto& non_neighbours = vertices_non_neighbours_[vertex_clique];
+            std::vector<std::pair<int32_t, int32_t>> vertex_swaps;
 
             for (const auto& non_neighbour_a: non_neighbours) {
                 if (tabu_list_.IsInRemovedList(non_neighbour_a)
@@ -468,24 +517,46 @@ public:
                         continue;
                     }
 
-                    RemoveFromClique(vertex_clique);
-                    tabu_list_.RestrictRemovedVertex(vertex_clique);
-
-                    AddToClique(non_neighbour_a);
-                    AddToClique(non_neighbour_b);
-                    tabu_list_.RestrictAddedVertex(non_neighbour_a);
-                    tabu_list_.RestrictAddedVertex(non_neighbour_b);
-                    return true;
+                    vertex_swaps.emplace_back( non_neighbour_a, non_neighbour_b);
                 }
+            }
+
+            if (!vertex_swaps.empty()) {
+                removals.push_back(vertex_clique);
+                additions.emplace_back(vertex_swaps);
             }
         }
 
-        return false;
+        if (removals.empty()) {
+            return false;
+        }
+
+        int removal_index = GenerateInRange(0, removals.size() - 1);
+        const auto& swaps = additions[removal_index];
+        int addition_index = GenerateInRange(0, swaps.size() - 1);
+
+        int vertex_to_remove = removals[removal_index];
+        const auto& vertex_to_add = swaps[addition_index];
+
+        RemoveFromClique(vertex_to_remove);
+        tabu_list_.RestrictRemovedVertex(vertex_to_remove);
+
+        AddToClique(vertex_to_add.first);
+        AddToClique(vertex_to_add.second);
+        tabu_list_.RestrictAddedVertex(vertex_to_add.first);
+        tabu_list_.RestrictAddedVertex(vertex_to_add.second);
+
+        return true;
     }
 
     bool Swap1To1() {
+        std::vector<int32_t> removals;
+        std::vector<std::vector<int32_t>> additions;
+
         for (int32_t index_clique = 0; index_clique <= index_q_; index_clique++) {
             int vertex_clique = qco_[index_clique];
+
+            std::vector<int32_t> vertex_swaps;
 
             // We should not remove recently added vertex.
             if (tabu_list_.IsInAddedList(vertex_clique)) {
@@ -499,16 +570,34 @@ public:
                 }
 
                 if (tightness_[non_neighbour] == 1) {
-                    RemoveFromClique(vertex_clique);
-                    tabu_list_.RestrictRemovedVertex(vertex_clique);
-
-                    AddToClique(non_neighbour);
-                    tabu_list_.RestrictAddedVertex(non_neighbour);
-                    return true;
+                    vertex_swaps.push_back(non_neighbour);
                 }
             }
+
+            if (!vertex_swaps.empty()) {
+                removals.push_back(vertex_clique);
+                additions.emplace_back(vertex_swaps);
+            }
         }
-        return false;
+
+        if (removals.empty()) {
+            return false;
+        }
+
+        int removal_index = GenerateInRange(0, removals.size() - 1);
+        const auto& swaps = additions[removal_index];
+        int addition_index = GenerateInRange(0, swaps.size() - 1);
+
+        int vertex_to_remove = removals[removal_index];
+        int vertex_to_add = swaps[addition_index];
+
+        RemoveFromClique(vertex_to_remove);
+        tabu_list_.RestrictRemovedVertex(vertex_to_remove);
+
+        AddToClique(vertex_to_add);
+        tabu_list_.RestrictAddedVertex(vertex_to_add);
+
+        return true;
     }
 
     bool Move() {
@@ -516,8 +605,8 @@ public:
             return false;
         }
 
-        // todo(st235): Consider taking a random vertex.
-        int vertex = qco_[index_c_];
+        const auto& move_index = GenerateInRange(index_q_ + 1, index_c_);
+        int32_t vertex = qco_[move_index];
         AddToClique(vertex);
         return true;
     }
@@ -539,6 +628,103 @@ public:
     ~Clique() = default;
 };
 
+struct SaturationNode {
+public:
+    int32_t id;
+    uint32_t saturation;
+    uint32_t uncolored_neighborhood_degree;
+
+    SaturationNode(uint32_t id, uint32_t saturation, uint32_t uncolored_neighborhood_degree):
+            id(id),
+            saturation(saturation),
+            uncolored_neighborhood_degree(uncolored_neighborhood_degree) {
+        // empty on purpose
+    }
+
+    SaturationNode(const SaturationNode& that) = default;
+    SaturationNode& operator=(const SaturationNode& that) = default;
+
+    ~SaturationNode() = default;
+};
+
+struct SaturationComparator {
+    bool operator()(const SaturationNode& lhs, const SaturationNode& rhs) const {
+        return std::tie(lhs.saturation, lhs.uncolored_neighborhood_degree, lhs.id) >
+               std::tie(rhs.saturation, rhs.uncolored_neighborhood_degree, rhs.id);
+    }
+};
+
+/**
+ * DSatur implementation of graph coloring.
+ */
+std::vector<int32_t> ColorGraph(const std::vector<std::unordered_set<int32_t>>& graph) {
+    std::set<SaturationNode, SaturationComparator> queue;
+
+    const auto& graph_size = graph.size();
+
+    std::vector<uint32_t> vertices_degrees(graph_size);
+    std::vector<std::unordered_set<int32_t>> adjacent_colors(graph_size);
+
+    std::vector<int32_t> colors(graph_size);
+
+    for (auto i = 0; i < graph.size(); i++) {
+        const auto& adjacent_vertices = graph[i];
+
+        // let's reset all colors to kColorNoColor
+        colors[i] = -1;
+        vertices_degrees[i] = adjacent_vertices.size();
+
+        queue.insert(SaturationNode(static_cast<uint32_t>(i),
+                                    static_cast<uint32_t>(adjacent_colors[i].size()),
+                                    vertices_degrees[i]));
+    }
+
+    while (!queue.empty()) {
+        const auto queue_iterator = queue.begin();
+        SaturationNode node = *queue_iterator;
+        queue.erase(queue_iterator);
+
+        int32_t current_color = -1;
+        std::vector<bool> available_colors(colors.size(), true);
+        for (const auto& neighbour: graph[node.id]) {
+            int32_t color = colors[neighbour];
+            if (color != -1) {
+                available_colors[color] = false;
+            }
+        }
+        for (size_t color = 0; color < available_colors.size(); color++) {
+            if (available_colors[color]) {
+                current_color = static_cast<int32_t>(color);
+                break;
+            }
+        }
+
+        colors[node.id] = current_color;
+
+        for (const auto& neighbour: graph[node.id]) {
+            if (colors[neighbour] != -1) {
+                continue;
+            }
+
+            SaturationNode old_neighbour_state(static_cast<uint32_t>(neighbour),
+                                               static_cast<uint32_t>(adjacent_colors[neighbour].size()),
+                                               vertices_degrees[neighbour]);
+
+            adjacent_colors[neighbour].insert(current_color);
+            vertices_degrees[neighbour] -= 1;
+            queue.erase(old_neighbour_state);
+
+            SaturationNode new_neighbour_state(static_cast<uint32_t>(neighbour),
+                                               static_cast<uint32_t>(adjacent_colors[neighbour].size()),
+                                               vertices_degrees[neighbour]);
+
+            queue.insert(new_neighbour_state);
+        }
+    }
+
+    return colors;
+}
+
 } // namespace
 
 class MaxCliqueTabuSearch {
@@ -546,34 +732,98 @@ private:
     std::vector<std::unordered_set<int32_t>> graph_;
     std::unordered_set<int32_t> best_clique_;
 
-    void RunInitialHeuristic(int randomization,
-                             Clique& clique) {
-        //todo(st235): replace initial heuristic.
-        std::mt19937 generator;
-
-        std::vector<int32_t> candidates(graph_.size());
-        for (size_t i = 0; i < graph_.size(); ++i) {
-            candidates[i] = i;
+    void RemoveSaturationNodeFromQueue(const SaturationNode& node,
+                                       const std::vector<int32_t>& graph_coloring,
+                                       std::set<SaturationNode, SaturationComparator>& queue,
+                                       std::vector<uint32_t>& degrees,
+                                       std::vector<std::unordered_map<int32_t, uint32_t>>& adjacent_colors) {
+        if (queue.find(node) != queue.end()) {
+            queue.erase(node);
         }
-        shuffle(candidates.begin(), candidates.end(), generator);
 
-        while (!candidates.empty()) {
-            int last = candidates.size() - 1;
-            int rnd = GenerateInRange(0, std::min(randomization - 1, last));
-            int vertex = candidates[rnd];
+        const auto& node_color = graph_coloring[node.id];
+        const auto& neighbours = graph_[node.id];
 
-            clique.AddToClique(vertex);
+        // update neighbours
+        for (const auto& neighbour: neighbours) {
+            SaturationNode old_neighbour_state(static_cast<uint32_t>(neighbour) /* id */,
+                                               static_cast<uint32_t>(adjacent_colors[neighbour].size()) /* saturation */,
+                                               degrees[neighbour] /* uncolored_neighborhood_degree */ );
 
-            for (int c = 0; c < candidates.size(); c++) {
-                int candidate = candidates[c];
-                if (graph_[vertex].find(candidate) == graph_[vertex].end()) {
-                    // Move the candidate to the end and pop it
-                    std::swap(candidates[c], candidates[candidates.size() - 1]);
-                    candidates.pop_back();
-                    --c;
-                }
+            if (queue.find(old_neighbour_state) == queue.end()) {
+                continue;
             }
-            shuffle(candidates.begin(), candidates.end(), generator);
+
+            queue.erase(old_neighbour_state);
+            degrees[neighbour] -= 1;
+            adjacent_colors[neighbour][node_color] -= 1;
+            if (adjacent_colors[neighbour][node_color] == 0) {
+                adjacent_colors[neighbour].erase(node_color);
+            }
+
+            SaturationNode new_neighbour_state(static_cast<uint32_t>(neighbour) /* id */,
+                                               static_cast<uint32_t>(adjacent_colors[neighbour].size()) /* saturation */,
+                                               degrees[neighbour] /* uncolored_neighborhood_degree */ );
+
+            queue.insert(new_neighbour_state);
+        }
+    }
+
+    void RunInitialHeuristic(Clique &clique) {
+        std::vector<uint32_t> degrees(graph_.size());
+
+        std::vector<int32_t> graph_coloring = ColorGraph(graph_);
+        std::vector<std::unordered_map<int32_t, uint32_t>> adjacent_colors(graph_.size());
+
+        for (auto node = 0; node < graph_.size(); node++) {
+            const auto& neighbours = graph_[node];
+            degrees[node] = neighbours.size();
+
+            for (const auto& neighbour: neighbours) {
+                const auto& neighbour_color = graph_coloring[neighbour];
+
+                if (adjacent_colors[node].find(neighbour_color) == adjacent_colors[node].end()) {
+                    adjacent_colors[node][neighbour_color] = 0;
+                }
+
+                adjacent_colors[node][neighbour_color] += 1;
+            }
+        }
+
+        std::set<SaturationNode, SaturationComparator> queue;
+
+        for (size_t node = 0; node < graph_.size(); node++) {
+            queue.insert(SaturationNode(static_cast<uint32_t>(node) /* id */,
+                                        static_cast<uint32_t>(adjacent_colors[node].size()) /* saturation */,
+                                        degrees[node] /* uncolored_neighborhood_degree */ ));
+        }
+
+        while (!queue.empty()) {
+            const auto queue_iterator = queue.begin();
+            SaturationNode node = *queue_iterator;
+            queue.erase(queue_iterator);
+
+            clique.AddToClique(node.id);
+
+            const auto& neighbours = graph_[node.id];
+
+            RemoveSaturationNodeFromQueue(node, graph_coloring, queue, degrees, adjacent_colors);
+
+            for (auto candidate = 0; candidate < graph_.size(); candidate++) {
+                if (neighbours.find(candidate) != neighbours.end()) {
+                    continue;
+                }
+
+                SaturationNode old_candidate_state(static_cast<uint32_t>(candidate) /* id */,
+                                                   static_cast<uint32_t>(adjacent_colors[candidate].size()) /* saturation */,
+                                                   degrees[candidate] /* uncolored_neighborhood_degree */ );
+
+                if (queue.find(old_candidate_state) == queue.end()) {
+                    continue;
+                }
+
+                RemoveSaturationNodeFromQueue(old_candidate_state, graph_coloring, queue, degrees, adjacent_colors);
+            }
         }
     }
 
@@ -603,19 +853,15 @@ public:
         }
     }
 
-    void RunSearch(int starts, int randomization) {
-        for (int iter = 0; iter < starts; ++iter) {
+    void RunSearch() {
+        for (int iter = 0; iter < 250; ++iter) {
             Clique clique(graph_.size(), graph_);
-            RunInitialHeuristic(randomization, clique);
+            RunInitialHeuristic(clique);
 
-            int swaps = 0;
-            while (swaps < 100) {
-                if (!clique.Move()) {
-                    if (!clique.Swap1To1()) {
-                        break;
-                    } else {
-                        ++swaps;
-                    }
+            for (size_t swaps = 0; swaps < 200; swaps++) {
+                if (!clique.Move() && !clique.Swap1To1() && !clique.Swap1to2()) {
+                    size_t clique_size = clique.CliqueSize();
+                    clique.Perturb(GenerateInRange(clique_size * 0.2, clique_size * 0.6));
                 }
             }
 
@@ -643,13 +889,6 @@ public:
 };
 
 int main() {
-    int iterations;
-    std::cout << "Number of iterations: ";
-    std::cin >> iterations;
-    int randomization;
-    std::cout << "Randomization: ";
-    std::cin >> randomization;
-
     std::vector<std::string> files = {
             "brock200_1.clq", "brock200_2.clq", "brock200_3.clq", "brock200_4.clq",
             "brock400_1.clq", "brock400_2.clq", "brock400_3.clq", "brock400_4.clq",
@@ -677,7 +916,7 @@ int main() {
         problem.ReadGraphFile("data/" + file);
 
         clock_t start = clock();
-        problem.RunSearch(iterations, randomization);
+        problem.RunSearch();
 
         clock_t end = clock();
         clock_t ticks_diff = end - start;

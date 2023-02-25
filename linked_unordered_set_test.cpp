@@ -195,6 +195,22 @@ public:
         return item;
     }
 
+    void clear() {
+        size_ = 0;
+        lookup_.clear();
+
+        LinkedNode<T>* node = head_;
+
+        while (node != nullptr) {
+            auto* next = node->next;
+            delete node;
+            node = next;
+        }
+
+        head_ = nullptr;
+        tail_ = nullptr;
+    }
+
     [[nodiscard]] inline bool contains(const T& item) const {
         return lookup_.find(item) != lookup_.end();
     }
@@ -367,6 +383,31 @@ void insert_theSameItem_changesItemRemoveOrder() {
     REQUIRE_TRUE(list.size() == 2)
 }
 
+void clear_returnsSize0() {
+    std::linked_unordered_set<int32_t> list(10);
+
+    list.insert(5);
+    list.insert(3);
+    list.insert(1);
+
+    list.clear();
+
+    REQUIRE_TRUE(list.size() == 0)
+    REQUIRE_TRUE(list.empty())
+}
+
+void clear_findElementThatWasOnTheList_returnsFalse() {
+    std::linked_unordered_set<int32_t> list(10);
+
+    list.insert(5);
+    list.insert(3);
+    list.insert(1);
+
+    list.clear();
+
+    REQUIRE_FALSE(list.contains(5))
+}
+
 }
 
 int main() {
@@ -386,6 +427,9 @@ int main() {
 
     tests::removeLast_removesLastItem();
     tests::insert_theSameItem_changesItemRemoveOrder();
+
+    tests::clear_returnsSize0();
+    tests::clear_findElementThatWasOnTheList_returnsFalse();
 
     return 0;
 }
