@@ -17,111 +17,138 @@ using namespace std;
 
 namespace std {
 
-    template<class T>
-    class linked_unordered_set {
-    private:
-        template<class V>
-        struct LinkedNode {
-            V item;
-            LinkedNode<V>* prev;
-            LinkedNode<V>* next;
+template<class T>
+class linked_unordered_set {
+private:
+    template<class V>
+    struct LinkedNode {
+        V item;
+        LinkedNode<V>* prev;
+        LinkedNode<V>* next;
 
-            explicit LinkedNode(const V& item):
-                    item(item),
-                    prev(nullptr),
-                    next(nullptr) {
-                // empty on purpose
-            }
-            LinkedNode(const LinkedNode<V>& node) = default;
-            LinkedNode<V>& operator=(const LinkedNode<V>& node) = default;
-
-            ~LinkedNode() = default;
-        };
-
-        size_t size_;
-        size_t capacity_;
-
-        std::unordered_map<T, LinkedNode<T>*> lookup_;
-        LinkedNode<T>* head_;
-        LinkedNode<T>* tail_;
-
-        [[nodiscard]] LinkedNode<T>* addToList(const T& item) {
-            auto* node = new LinkedNode<T>(item);
-
-            if (head_ == nullptr) {
-                assert(tail_ == nullptr);
-
-                head_ = node;
-                tail_ = node;
-            } else {
-                // head_ is not null.
-                assert(tail_ != nullptr);
-
-                tail_->next = node;
-                node->prev = tail_;
-                tail_ = node;
-            }
-
-            return node;
-        }
-
-        void removeFromList(const T& item) {
-            LinkedNode<T>* node = lookup_.at(item);
-
-            LinkedNode<T>* prev = node->prev;
-            LinkedNode<T>* next = node->next;
-
-            if (prev != nullptr) {
-                prev->next = next;
-            }
-
-            if (next != nullptr) {
-                next->prev = prev;
-            }
-
-            if (head_ == node) {
-                head_ = next;
-            }
-
-            if (tail_ == node) {
-                tail_ = prev;
-            }
-
-            delete node;
-        }
-
-        LinkedNode<T>* createDeepCopy(LinkedNode<T>* list) {
-            if (list == nullptr) {
-                return nullptr;
-            }
-
-            auto* node = new LinkedNode<T>(list->item);
-
-            auto* next = createDeepCopy(node->next);
-            if (next != nullptr) {
-                next->prev = node;
-            }
-
-            node->next = next;
-            return node;
-        }
-
-    public:
-        explicit linked_unordered_set(size_t capacity):
-                size_(0),
-                capacity_(capacity),
-                lookup_(),
-                head_(nullptr),
-                tail_(nullptr) {
+        explicit LinkedNode(const V& item):
+                item(item),
+                prev(nullptr),
+                next(nullptr) {
             // empty on purpose
         }
+        LinkedNode(const LinkedNode<V>& node) = default;
+        LinkedNode<V>& operator=(const LinkedNode<V>& node) = default;
 
-        linked_unordered_set(const linked_unordered_set<T>& that):
-                size_(that.size_),
-                capacity_(that.capacity_),
-                lookup_(),
-                head_(nullptr),
-                tail_(nullptr) {
+        ~LinkedNode() = default;
+    };
+
+    size_t size_;
+    size_t capacity_;
+
+    std::unordered_map<T, LinkedNode<T>*> lookup_;
+    LinkedNode<T>* head_;
+    LinkedNode<T>* tail_;
+
+    [[nodiscard]] LinkedNode<T>* addToList(const T& item) {
+        auto* node = new LinkedNode<T>(item);
+
+        if (head_ == nullptr) {
+            assert(tail_ == nullptr);
+
+            head_ = node;
+            tail_ = node;
+        } else {
+            // head_ is not null.
+            assert(tail_ != nullptr);
+
+            tail_->next = node;
+            node->prev = tail_;
+            tail_ = node;
+        }
+
+        return node;
+    }
+
+    void removeFromList(const T& item) {
+        LinkedNode<T>* node = lookup_.at(item);
+
+        LinkedNode<T>* prev = node->prev;
+        LinkedNode<T>* next = node->next;
+
+        if (prev != nullptr) {
+            prev->next = next;
+        }
+
+        if (next != nullptr) {
+            next->prev = prev;
+        }
+
+        if (head_ == node) {
+            head_ = next;
+        }
+
+        if (tail_ == node) {
+            tail_ = prev;
+        }
+
+        delete node;
+    }
+
+    LinkedNode<T>* createDeepCopy(LinkedNode<T>* list) {
+        if (list == nullptr) {
+            return nullptr;
+        }
+
+        auto* node = new LinkedNode<T>(list->item);
+
+        auto* next = createDeepCopy(node->next);
+        if (next != nullptr) {
+            next->prev = node;
+        }
+
+        node->next = next;
+        return node;
+    }
+
+public:
+    explicit linked_unordered_set(size_t capacity):
+            size_(0),
+            capacity_(capacity),
+            lookup_(),
+            head_(nullptr),
+            tail_(nullptr) {
+        // empty on purpose
+    }
+
+    linked_unordered_set(const linked_unordered_set<T>& that):
+            size_(that.size_),
+            capacity_(that.capacity_),
+            lookup_(),
+            head_(nullptr),
+            tail_(nullptr) {
+        head_ = createDeepCopy(that.head_);
+        tail_ = head_;
+
+        while (tail_ != nullptr && tail_->next != nullptr) {
+            lookup_.insert({ tail_->item, tail_ });
+            tail_ = tail_->next;
+        }
+
+        if (tail_ != nullptr) {
+            lookup_.insert({ tail_->item, tail_ });
+        }
+    }
+
+    linked_unordered_set<T>& operator=(const linked_unordered_set<T>& that) {
+        if (this != &that) {
+            size_ = that.size_;
+            capacity_ = that.capacity_;
+
+            lookup_.clear();
+            LinkedNode<T>* node = head_;
+
+            while (node != nullptr) {
+                auto* next = node->next;
+                delete node;
+                node = next;
+            }
+
             head_ = createDeepCopy(that.head_);
             tail_ = head_;
 
@@ -135,105 +162,78 @@ namespace std {
             }
         }
 
-        linked_unordered_set<T>& operator=(const linked_unordered_set<T>& that) {
-            if (this != &that) {
-                size_ = that.size_;
-                capacity_ = that.capacity_;
+        return &this;
+    }
 
-                lookup_.clear();
-                LinkedNode<T>* node = head_;
-
-                while (node != nullptr) {
-                    auto* next = node->next;
-                    delete node;
-                    node = next;
-                }
-
-                head_ = createDeepCopy(that.head_);
-                tail_ = head_;
-
-                while (tail_ != nullptr && tail_->next != nullptr) {
-                    lookup_.insert({ tail_->item, tail_ });
-                    tail_ = tail_->next;
-                }
-
-                if (tail_ != nullptr) {
-                    lookup_.insert({ tail_->item, tail_ });
-                }
-            }
-
-            return &this;
-        }
-
-        void insert(const T& item) {
-            if (contains(item)) {
-                remove(item);
-            }
-
-            auto* node = addToList(item);
-            lookup_.insert({ item, node });
-
-            size_ += 1;
-
-            if (size_ > capacity_) {
-                remove();
-            }
-        }
-
-        bool remove(const T& item) {
-            if (!contains(item)) {
-                return false;
-            }
-
-            removeFromList(item);
-            lookup_.erase(item);
-            size_ -= 1;
-            return true;
-        }
-
-        T remove() {
-            if (empty()) {
-                throw std::runtime_error("Cannot remove item from empty set.");
-            }
-
-            assert(head_ != nullptr && tail_ != nullptr);
-            assert(!lookup_.empty());
-
-            // We need to explicitly copy
-            // the item before it would be removed.
-            T item(head_->item);
+    void insert(const T& item) {
+        if (contains(item)) {
             remove(item);
-            return item;
         }
 
-        [[nodiscard]] inline bool contains(const T& item) const {
-            return lookup_.find(item) != lookup_.end();
+        auto* node = addToList(item);
+        lookup_.insert({ item, node });
+
+        size_ += 1;
+
+        if (size_ > capacity_) {
+            remove();
+        }
+    }
+
+    bool remove(const T& item) {
+        if (!contains(item)) {
+            return false;
         }
 
-        [[nodiscard]] inline bool empty() const {
-            bool is_empty = lookup_.empty();
-            if (is_empty) {
-                assert(head_ == nullptr && tail_ == nullptr);
-            } else {
-                assert(head_ != nullptr && tail_ != nullptr);
-            }
-            return is_empty;
+        removeFromList(item);
+        lookup_.erase(item);
+        size_ -= 1;
+        return true;
+    }
+
+    T remove() {
+        if (empty()) {
+            throw std::runtime_error("Cannot remove item from empty set.");
         }
 
-        [[nodiscard]] inline size_t size() const {
-            return size_;
-        }
+        assert(head_ != nullptr && tail_ != nullptr);
+        assert(!lookup_.empty());
 
-        ~linked_unordered_set() {
-            LinkedNode<T>* node = head_;
+        // We need to explicitly copy
+        // the item before it would be removed.
+        T item(head_->item);
+        remove(item);
+        return item;
+    }
 
-            while (node != nullptr) {
-                LinkedNode<T>* real_next = node->next;
-                delete node;
-                node = real_next;
-            }
+    [[nodiscard]] inline bool contains(const T& item) const {
+        return lookup_.find(item) != lookup_.end();
+    }
+
+    [[nodiscard]] inline bool empty() const {
+        bool is_empty = lookup_.empty();
+        if (is_empty) {
+            assert(head_ == nullptr && tail_ == nullptr);
+        } else {
+            assert(head_ != nullptr && tail_ != nullptr);
         }
-    };
+        return is_empty;
+    }
+
+    [[nodiscard]] inline size_t size() const {
+        return size_;
+    }
+
+    ~linked_unordered_set() {
+        LinkedNode<T>* node = head_;
+
+        while (node != nullptr) {
+            LinkedNode<T>* real_next = node->next;
+            delete node;
+            node = real_next;
+        }
+    }
+};
 
 } // namespace std
 
