@@ -854,18 +854,18 @@ public:
     }
 
     void RunSearch() {
-        for (int iter = 0; iter < 300; ++iter) {
+        for (int iter = 0; iter < 400; ++iter) {
             Clique clique(graph_.size(), graph_);
             RunInitialHeuristic(clique);
 
-            for (size_t swaps = 0; swaps < 300; swaps++) {
+            for (size_t swaps = 0; swaps < 500; swaps++) {
                 if (!clique.Move() && !clique.Swap1To1() && !clique.Swap1to2()) {
                     if (clique.CliqueSize() > best_clique_.size()) {
                         best_clique_ = std::move(clique.GetClique());
                     }
 
                     size_t clique_size = clique.CliqueSize();
-                    clique.Perturb(GenerateInRange(clique_size * 0.3, clique_size * 0.7));
+                    clique.Perturb(GenerateInRange(clique_size * 0.45, clique_size * 0.85));
                 }
             }
 
