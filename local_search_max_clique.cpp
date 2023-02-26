@@ -260,24 +260,26 @@ double RoundTo(double value, double precision = 1.0) {
     return std::round(value / precision) * precision;
 }
 
+template<typename T>
+std::string ConvertToString(
+        const std::unordered_set<T>& collection,
+        const std::string& delimiter = " ") {
+    std::ostringstream os;
+    int32_t i = 0;
+    for (const auto& item: collection) {
+        if (i > 0) {
+            os << delimiter;
+        }
+        os << item;
+        i++;
+    }
+    return os.str();
+}
+
 int32_t GenerateInRange(int32_t start, int32_t finish) {
     int32_t width = finish - start + 1;
     return static_cast<int32_t>(std::rand() % width + start);
 }
-
-constexpr uint32_t kOperationMove = 1;
-constexpr uint32_t kOperationSwap11 = 2;
-constexpr uint32_t kOperationSwap12 = 3;
-
-constexpr uint32_t kOperations[] = { kOperationMove, kOperationMove, kOperationMove, kOperationMove, kOperationMove,
-                                     kOperationSwap11, kOperationSwap11, kOperationSwap11,
-                                     kOperationSwap12, kOperationSwap12 };
-
-uint32_t GetOperation() {
-    static_assert(sizeof(kOperations) / sizeof(uint32_t) == 10);
-    return kOperations[GenerateInRange(0, 9)];
-}
-
 
 class TabooList {
 private:
@@ -910,7 +912,7 @@ int main() {
             "sanr200_0.9.clq", "sanr400_0.7.clq" };
 
     std::ofstream fout("clique_tabu.csv");
-    fout << "File; Clique; Time (sec)\n";
+    fout << "File; Clique; Time (sec); Clique vertices" << std::endl;
 
     std::cout << std::setfill(' ') << std::setw(20) << "Instance"
               << std::setfill(' ') << std::setw(10) << "Clique"
@@ -933,10 +935,16 @@ int main() {
             fout << "*** WARNING: incorrect clique ***\n";
         }
 
-        fout << file << "; " << problem.GetClique().size() << "; " << seconds_diff << '\n';
+        const auto& best_clique = problem.GetClique();
+
+        fout << file << "; "
+             << best_clique.size() << "; "
+             << seconds_diff  << "; "
+             << ConvertToString(best_clique, ", ")
+             << std::endl;
 
         std::cout << std::setfill(' ') << std::setw(20) << file
-                  << std::setfill(' ') << std::setw(10) << problem.GetClique().size()
+                  << std::setfill(' ') << std::setw(10) << best_clique.size()
                   << std::setfill(' ') << std::setw(15) << seconds_diff
                   << std::endl;
     }
