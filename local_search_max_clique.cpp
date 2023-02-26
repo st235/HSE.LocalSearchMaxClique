@@ -9,6 +9,8 @@
 #include <cstddef>
 #include <random>
 #include <queue>
+#include <memory>
+#include <iomanip>
 #include <unordered_set>
 #include <unordered_map>
 #include <set>
