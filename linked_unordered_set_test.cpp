@@ -1,4 +1,5 @@
 #include <iostream>
+#include <vector>
 #include <unordered_map>
 
 #define REQUIRE_TRUE(x) { if (!(x)) { std::cerr << __FUNCTION__ << " was false,\nbut expected true\non line: " << __LINE__ << std::endl; } else { std::cout << __FUNCTION__ << " passed" << std::endl; } }
@@ -96,6 +97,50 @@ private:
     }
 
 public:
+    template<class V>
+    struct iterator
+    {
+        using iterator_category = std::forward_iterator_tag;
+        using difference_type   = std::ptrdiff_t;
+        using value_type        = V;
+        using pointer           = V*;
+        using reference         = V&;
+
+        iterator(LinkedNode<V>* ptr) : ptr_(ptr) {
+            // empty on purpose
+        }
+
+        reference operator*() const {
+            return ptr_->item;
+        }
+
+        pointer operator->() {
+            return &ptr_->item;
+        }
+
+        iterator& operator++() {
+            ptr_ = ptr_->next;
+            return *this;
+        }
+
+        iterator operator++(int) {
+            iterator tmp = *this;
+            ++(*this);
+            return tmp;
+        }
+
+        friend bool operator==(const iterator& a, const iterator& b) {
+            return a.ptr_ == b.ptr_;
+        }
+
+        friend bool operator!=(const iterator& a, const iterator& b) {
+            return a.ptr_ != b.ptr_;
+        }
+
+    private:
+        LinkedNode<V>* ptr_;
+    };
+
     explicit linked_unordered_set(size_t capacity):
             size_(0),
             capacity_(capacity),
@@ -209,6 +254,14 @@ public:
 
         head_ = nullptr;
         tail_ = nullptr;
+    }
+
+    [[nodiscard]] inline iterator<T> begin() const {
+        return iterator<T>(head_);
+    }
+
+    [[nodiscard]] inline iterator<T> end() const {
+        return iterator<T>(nullptr);
     }
 
     [[nodiscard]] inline bool contains(const T& item) const {
@@ -408,6 +461,66 @@ void clear_findElementThatWasOnTheList_returnsFalse() {
     REQUIRE_FALSE(list.contains(5))
 }
 
+void iterator_empty_yieldsNoElements() {
+    std::linked_unordered_set<int32_t> list(10);
+
+    std::vector<int32_t> actual_list;
+    for (auto i = list.begin(); i != list.end(); i++) {
+        actual_list.push_back(*i);
+    }
+
+    REQUIRE_TRUE(actual_list.empty())
+}
+
+void iterator_hasSomeElements_yieldsInAddedOrder() {
+    std::linked_unordered_set<int32_t> list(10);
+
+    list.insert(1);
+    list.insert(5);
+    list.insert(3);
+
+    std::vector<int32_t> actual_list;
+    for (auto i = list.begin(); i != list.end(); i++) {
+        actual_list.push_back(*i);
+    }
+
+    std::vector<int32_t> expected_list = { 1, 5, 3 };
+
+    REQUIRE_TRUE(expected_list == actual_list)
+}
+
+void iterator_elementsCountIsOverCapacity_yieldsInAddedOrderOnlyExistingElements() {
+    std::linked_unordered_set<int32_t> list(2);
+
+    list.insert(1);
+    list.insert(5);
+    list.insert(3);
+    list.insert(7);
+
+    std::vector<int32_t> actual_list;
+    for (auto i = list.begin(); i != list.end(); i++) {
+        actual_list.push_back(*i);
+    }
+
+    std::vector<int32_t> expected_list = { 3, 7 };
+
+    REQUIRE_TRUE(expected_list == actual_list)
+}
+
+void iterator_copy_hasTheSameItemsInTheSameOrder() {
+    std::linked_unordered_set<int32_t> list(5);
+
+    list.insert(7);
+    list.insert(1);
+    list.insert(3);
+
+    std::vector<int32_t> actual_list(list.begin(), list.end());
+
+    std::vector<int32_t> expected_list = { 7, 1, 3 };
+
+    REQUIRE_TRUE(expected_list == actual_list)
+}
+
 }
 
 int main() {
@@ -430,6 +543,11 @@ int main() {
 
     tests::clear_returnsSize0();
     tests::clear_findElementThatWasOnTheList_returnsFalse();
+
+    tests::iterator_empty_yieldsNoElements();
+    tests::iterator_hasSomeElements_yieldsInAddedOrder();
+    tests::iterator_elementsCountIsOverCapacity_yieldsInAddedOrderOnlyExistingElements();
+    tests::iterator_copy_hasTheSameItemsInTheSameOrder();
 
     return 0;
 }
