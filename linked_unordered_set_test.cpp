@@ -106,7 +106,7 @@ public:
         using pointer           = V*;
         using reference         = V&;
 
-        iterator(LinkedNode<V>* ptr) : ptr_(ptr) {
+        explicit iterator(LinkedNode<V>* ptr) : ptr_(ptr) {
             // empty on purpose
         }
 
@@ -118,22 +118,66 @@ public:
             return &ptr_->item;
         }
 
-        iterator& operator++() {
+        iterator<T>& operator++() {
             ptr_ = ptr_->next;
             return *this;
         }
 
-        iterator operator++(int) {
-            iterator tmp = *this;
+        iterator<T> operator++(int) {
+            iterator<T> tmp = *this;
             ++(*this);
             return tmp;
         }
 
-        friend bool operator==(const iterator& a, const iterator& b) {
+        friend bool operator==(const iterator<T>& a, const iterator<T>& b) {
             return a.ptr_ == b.ptr_;
         }
 
-        friend bool operator!=(const iterator& a, const iterator& b) {
+        friend bool operator!=(const iterator<T>& a, const iterator<T>& b) {
+            return a.ptr_ != b.ptr_;
+        }
+
+    private:
+        LinkedNode<V>* ptr_;
+    };
+
+    template<class V>
+    struct reverse_iterator
+    {
+        using iterator_category = std::forward_iterator_tag;
+        using difference_type   = std::ptrdiff_t;
+        using value_type        = V;
+        using pointer           = V*;
+        using reference         = V&;
+
+        explicit reverse_iterator(LinkedNode<V>* ptr): ptr_(ptr) {
+            // empty on purpose
+        }
+
+        reference operator*() const {
+            return ptr_->item;
+        }
+
+        pointer operator->() {
+            return &ptr_->item;
+        }
+
+        reverse_iterator<T>& operator++() {
+            ptr_ = ptr_->prev;
+            return *this;
+        }
+
+        reverse_iterator<T> operator++(int) {
+            reverse_iterator<T> tmp = *this;
+            ++(*this);
+            return tmp;
+        }
+
+        friend bool operator==(const reverse_iterator<T>& a, const reverse_iterator<T>& b) {
+            return a.ptr_ == b.ptr_;
+        }
+
+        friend bool operator!=(const reverse_iterator<T>& a, const reverse_iterator<T>& b) {
             return a.ptr_ != b.ptr_;
         }
 
@@ -262,6 +306,14 @@ public:
 
     [[nodiscard]] inline iterator<T> end() const {
         return iterator<T>(nullptr);
+    }
+
+    [[nodiscard]] inline reverse_iterator<T> rbegin() const {
+        return reverse_iterator<T>(tail_);
+    }
+
+    [[nodiscard]] inline reverse_iterator<T> rend() const {
+        return reverse_iterator<T>(nullptr);
     }
 
     [[nodiscard]] inline bool contains(const T& item) const {
@@ -521,6 +573,66 @@ void iterator_copy_hasTheSameItemsInTheSameOrder() {
     REQUIRE_TRUE(expected_list == actual_list)
 }
 
+void reverse_iterator_empty_yieldsNoElements() {
+    std::linked_unordered_set<int32_t> list(10);
+
+    std::vector<int32_t> actual_list;
+    for (auto i = list.rbegin(); i != list.rend(); i++) {
+        actual_list.push_back(*i);
+    }
+
+    REQUIRE_TRUE(actual_list.empty())
+}
+
+void reverse_iterator_hasSomeElements_yieldsInAddedOrder() {
+    std::linked_unordered_set<int32_t> list(10);
+
+    list.insert(1);
+    list.insert(5);
+    list.insert(3);
+
+    std::vector<int32_t> actual_list;
+    for (auto i = list.rbegin(); i != list.rend(); i++) {
+        actual_list.push_back(*i);
+    }
+
+    std::vector<int32_t> expected_list = { 3, 5, 1 };
+
+    REQUIRE_TRUE(expected_list == actual_list)
+}
+
+void reverse_iterator_elementsCountIsOverCapacity_yieldsInAddedOrderOnlyExistingElements() {
+    std::linked_unordered_set<int32_t> list(2);
+
+    list.insert(1);
+    list.insert(5);
+    list.insert(3);
+    list.insert(7);
+
+    std::vector<int32_t> actual_list;
+    for (auto i = list.rbegin(); i != list.rend(); i++) {
+        actual_list.push_back(*i);
+    }
+
+    std::vector<int32_t> expected_list = { 7, 3 };
+
+    REQUIRE_TRUE(expected_list == actual_list)
+}
+
+void reverse_iterator_copy_hasTheSameItemsInTheSameOrder() {
+    std::linked_unordered_set<int32_t> list(5);
+
+    list.insert(7);
+    list.insert(1);
+    list.insert(3);
+
+    std::vector<int32_t> actual_list(list.rbegin(), list.rend());
+
+    std::vector<int32_t> expected_list = { 3, 1, 7 };
+
+    REQUIRE_TRUE(expected_list == actual_list)
+}
+
 }
 
 int main() {
@@ -548,6 +660,11 @@ int main() {
     tests::iterator_hasSomeElements_yieldsInAddedOrder();
     tests::iterator_elementsCountIsOverCapacity_yieldsInAddedOrderOnlyExistingElements();
     tests::iterator_copy_hasTheSameItemsInTheSameOrder();
+
+    tests::reverse_iterator_empty_yieldsNoElements();
+    tests::reverse_iterator_hasSomeElements_yieldsInAddedOrder();
+    tests::reverse_iterator_elementsCountIsOverCapacity_yieldsInAddedOrderOnlyExistingElements();
+    tests::reverse_iterator_copy_hasTheSameItemsInTheSameOrder();
 
     return 0;
 }
